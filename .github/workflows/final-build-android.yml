@@ -25,7 +25,7 @@ jobs:
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '11'
+        java-version: '17'  # 升级到Java 17以兼容最新的Android SDK工具
         
     - name: 📱 使用官方Android Setup Action
       uses: android-actions/setup-android@v3
