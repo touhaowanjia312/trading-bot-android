@@ -222,3 +222,29 @@ jobs:
         retention-days: 30
         
     - name: 📋 最终构建报告
+      if: always()
+      run: |
+        echo "📊 最终构建报告"
+        echo "=================="
+        
+        total_apks=$(find . -name "*.apk" -type f 2>/dev/null | wc -l)
+        echo "🎯 总共找到APK文件: $total_apks 个"
+        
+        if [ $total_apks -gt 0 ]; then
+          echo "✅ 🎉 APK构建成功！"
+          echo "=== APK文件列表 ==="
+          find . -name "*.apk" -type f -exec ls -lh {} \; | head -10
+          
+          echo "=== 最大的APK文件 ==="
+          find . -name "*.apk" -type f -exec ls -lh {} \; | sort -k5 -hr | head -3
+        else
+          echo "❌ 仍然未找到APK文件"
+          echo ""
+          echo "🔍 可能的原因和调试信息："
+          echo "1. 检查上传的 build_complete.log 文件"
+          echo "2. 构建可能在某个隐藏步骤失败了"
+          echo "3. APK可能生成在了非标准位置"
+          echo ""
+          echo "=== buildozer目录结构 ==="
+          find .buildozer -type d -name "*apk*" 2>/dev/null | head -10 || echo "没有apk相关目录"
+        fi
