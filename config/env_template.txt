@@ -1,0 +1,41 @@
+# Telegram API配置
+TELEGRAM_API_ID=your_api_id
+TELEGRAM_API_HASH=your_api_hash
+TELEGRAM_PHONE_NUMBER=+86your_phone_number
+TELEGRAM_SESSION_NAME=trading_bot
+
+# 监控的Telegram群组 (可以是群组ID或用户名)
+TELEGRAM_GROUP_ID=your_group_id_or_username
+
+# Bitget API配置
+BITGET_API_KEY=your_bitget_api_key
+BITGET_SECRET_KEY=your_bitget_secret_key
+BITGET_PASSPHRASE=your_bitget_passphrase
+BITGET_SANDBOX=false
+
+# 交易配置
+DEFAULT_TRADE_AMOUNT=2.0
+DEFAULT_LEVERAGE=20
+MAX_POSITION_SIZE=1000.0
+RISK_PERCENTAGE=2.0
+STOP_LOSS_PERCENTAGE=5.0
+TAKE_PROFIT_PERCENTAGE=10.0
+USE_TRADER_SIGNALS_FOR_TP_SL=true
+
+# 数据库配置
+DATABASE_URL=sqlite:///data/trading.db
+
+# 日志配置
+LOG_LEVEL=INFO
+LOG_FILE_PATH=data/logs/trading_bot.log
+
+# 通知配置
+ENABLE_DESKTOP_NOTIFICATIONS=true
+ENABLE_SOUND_NOTIFICATIONS=true
+NOTIFICATION_SOUND_PATH=sounds/notification.wav
+
+# GUI配置
+WINDOW_TITLE=Telegram交易信号跟单系统
+WINDOW_WIDTH=1200
+WINDOW_HEIGHT=800
+THEME=light

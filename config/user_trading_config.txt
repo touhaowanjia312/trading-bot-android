@@ -1,0 +1,5 @@
+# 用户交易配置
+CURRENT_EXCHANGE=bitget
+TRADE_AMOUNT=3.0
+LEVERAGE=20
+# 配置更新时间: 2025-09-09 21:08:28
