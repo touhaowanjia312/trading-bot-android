@@ -55,6 +55,12 @@ jobs:
     - name: 📦 安装系统依赖
       run: |
         sudo apt-get update -qq
+        
+        # 启用32位架构支持
+        sudo dpkg --add-architecture i386
+        sudo apt-get update -qq
+        
+        # 安装主要依赖
         sudo apt-get install -y \
           build-essential \
           git \
@@ -75,12 +81,14 @@ jobs:
           cmake \
           ninja-build \
           ccache \
-          libncurses5:i386 \
-          libstdc++6:i386 \
-          zlib1g:i386 \
-          openjdk-8-jdk \
           wget \
           curl
+        
+        # 尝试安装32位库（Ubuntu 24.04兼容）
+        sudo apt-get install -y \
+          libc6:i386 \
+          libstdc++6:i386 \
+          zlib1g:i386 || echo "⚠️ 某些32位库安装失败，但可能不影响构建"
           
     - name: 🐍 安装Python依赖
       run: |
