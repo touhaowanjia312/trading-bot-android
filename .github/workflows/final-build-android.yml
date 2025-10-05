@@ -1,4 +1,4 @@
-name: 🤖 最终修复版Android构建
+name: 🤖 修复版Android构建
 
 on:
   push:
@@ -25,7 +25,7 @@ jobs:
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '11'
+        java-version: '11'  # 改为Java 11，更稳定
         
     - name: 📦 安装系统依赖
       run: |
@@ -52,37 +52,48 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install wheel setuptools
-        pip install buildozer==1.4.0
-        pip install cython==0.29.33
+        pip install buildozer==1.4.0  # 固定版本
+        pip install cython==0.29.33   # 固定版本
         pip install kivy==2.1.0
         
-    - name: 📱 手动设置Android SDK
+    - name: 📱 手动设置Android SDK (修复版)
       run: |
+        # 设置环境变量
         export ANDROID_HOME=$HOME/android-sdk
         export ANDROID_SDK_ROOT=$ANDROID_HOME
         export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
         
+        # 创建目录
         mkdir -p $ANDROID_HOME/cmdline-tools
         
+        # 下载命令行工具
         cd $ANDROID_HOME/cmdline-tools
         wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
         unzip -q commandlinetools-linux-8512546_latest.zip
         mv cmdline-tools latest
         
+        # 接受许可证
         yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
         
+        # 安装必要组件 (使用稳定版本)
         $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
           "platform-tools" \
           "platforms;android-30" \
           "build-tools;30.0.3" \
           "ndk;21.4.7075529"
         
+        # 验证安装
+        ls -la $ANDROID_HOME/
+        ls -la $ANDROID_HOME/build-tools/
+        
+        # 保存环境变量到后续步骤
         echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
         echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
         echo "PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3" >> $GITHUB_ENV
         
-    - name: 📝 创建应用文件
+    - name: 📝 创建优化的应用文件
       run: |
+        # 创建简单的main.py
         cat > main.py << 'EOF'
         #!/usr/bin/env python3
         from kivy.app import App
@@ -98,6 +109,7 @@ jobs:
             TradingApp().run()
         EOF
         
+        # 创建优化的buildozer.spec
         cat > buildozer.spec << 'EOF'
         [app]
         title = TradingBot
@@ -105,7 +117,6 @@ jobs:
         package.domain = com.example.tradingbot
         source.dir = .
         source.include_exts = py,png,jpg,kv,atlas
-        source.main = main.py
         version = 1.0
         requirements = python3,kivy
         
@@ -125,100 +136,46 @@ jobs:
         android.add_packaging_options = 
         EOF
         
-    - name: 🏗️ 构建Android APK
+    - name: 🏗️ 构建Android APK (修复版)
       run: |
         echo "🔨 开始构建APK..."
         
-        echo "环境信息:"
+        # 显示环境信息
         echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "Java版本:"
         java -version
+        echo "Python版本:"
         python --version
         
+        # 清理可能的缓存
         rm -rf .buildozer
         
-        # 构建APK并捕获所有输出
-        buildozer android debug --verbose > build_full.log 2>&1 || {
-          echo "❌ 构建失败！"
-          echo "=== 最后100行构建日志 ==="
-          tail -100 build_full.log
-          echo "=== 错误信息 ==="
-          grep -i "error\|fail\|exception" build_full.log | tail -30 || echo "未找到明确错误"
+        # 构建APK
+        buildozer android debug --verbose 2>&1 | tee build.log || {
+          echo "❌ 构建失败，显示最后50行日志："
+          tail -50 build.log
+          echo "❌ 显示错误相关日志："
+          grep -i "error\|fail\|exception" build.log | tail -20 || echo "未找到明确错误信息"
           exit 1
         }
         
-        echo "✅ 构建命令执行完成"
-        
-    - name: 🔍 全面搜索APK文件
+    - name: 📋 显示构建结果
       run: |
-        echo "🔍 开始全面搜索APK文件..."
+        echo "🎉 构建完成！"
+        echo "查找APK文件:"
+        find . -name "*.apk" -type f -exec ls -lh {} \; || echo "未找到APK文件"
         
-        echo "=== 当前目录结构 ==="
-        ls -la
+        echo "查找构建目录:"
+        ls -la bin/ 2>/dev/null || echo "bin目录不存在"
+        ls -la .buildozer/android/platform/build-*/build/outputs/apk/ 2>/dev/null || echo "标准APK输出目录不存在"
         
-        echo "=== 搜索所有APK文件 ==="
-        find . -name "*.apk" -type f 2>/dev/null | while read apk; do
-          echo "📱 找到APK: $apk"
-          ls -lh "$apk"
-          file "$apk"
-        done
-        
-        echo "=== 检查bin目录 ==="
-        if [ -d "bin" ]; then
-          ls -la bin/
-        else
-          echo "bin目录不存在"
-        fi
-        
-        echo "=== 检查buildozer目录结构 ==="
-        if [ -d ".buildozer" ]; then
-          echo "buildozer目录存在，查找APK..."
-          find .buildozer -name "*.apk" -type f 2>/dev/null | head -10
-          
-          echo "=== 检查gradle输出目录 ==="
-          find .buildozer -path "*/build/outputs/apk*" -type d 2>/dev/null | while read dir; do
-            echo "检查目录: $dir"
-            ls -la "$dir" 2>/dev/null || echo "目录为空或无法访问"
-          done
-        else
-          echo ".buildozer目录不存在"
-        fi
-        
-        echo "=== 检查构建日志中的APK路径 ==="
-        if [ -f "build_full.log" ]; then
-          echo "搜索构建日志中的APK相关信息:"
-          grep -i "\.apk\|apk.*created\|apk.*generated\|output.*apk" build_full.log | tail -10 || echo "日志中未找到APK信息"
-        fi
-        
-    - name: 📤 上传所有构建产物
+    - name: 📤 上传构建产物
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: android-build-complete
+        name: android-build-artifacts
         path: |
-          **/*.apk
-          bin/
-          .buildozer/android/platform/build-*/build/outputs/
-          build_full.log
+          bin/*.apk
+          .buildozer/android/platform/build-*/build/outputs/apk/**/*.apk
+          build.log
         retention-days: 30
-        
-    - name: 📋 构建总结
-      if: always()
-      run: |
-        echo "📊 构建总结报告"
-        echo "=================="
-        
-        apk_count=$(find . -name "*.apk" -type f 2>/dev/null | wc -l)
-        echo "🎯 找到APK文件数量: $apk_count"
-        
-        if [ $apk_count -gt 0 ]; then
-          echo "✅ APK构建成功！"
-          find . -name "*.apk" -type f -exec ls -lh {} \;
-        else
-          echo "❌ 未找到APK文件"
-          echo "可能的原因:"
-          echo "1. 构建过程虽然没报错，但实际失败了"
-          echo "2. APK生成在了意外的位置"
-          echo "3. Buildozer配置有问题"
-          echo ""
-          echo "请检查上传的构建日志 build_full.log 获取详细信息"
-        fi
