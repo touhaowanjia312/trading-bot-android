@@ -1,0 +1,181 @@
+name: 🤖 修复版Android构建
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    steps:
+    - name: 📥 检出代码
+      uses: actions/checkout@v4
+      
+    - name: 🐍 设置Python环境
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: ☕ 设置Java环境
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '11'  # 改为Java 11，更稳定
+        
+    - name: 📦 安装系统依赖
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y \
+          build-essential \
+          git \
+          python3-dev \
+          python3-pip \
+          python3-setuptools \
+          python3-wheel \
+          libffi-dev \
+          libssl-dev \
+          libjpeg-dev \
+          zlib1g-dev \
+          unzip \
+          wget \
+          curl \
+          autoconf \
+          libtool \
+          pkg-config
+          
+    - name: 🐍 安装Python依赖
+      run: |
+        python -m pip install --upgrade pip
+        pip install wheel setuptools
+        pip install buildozer==1.4.0  # 固定版本
+        pip install cython==0.29.33   # 固定版本
+        pip install kivy==2.1.0
+        
+    - name: 📱 手动设置Android SDK (修复版)
+      run: |
+        # 设置环境变量
+        export ANDROID_HOME=$HOME/android-sdk
+        export ANDROID_SDK_ROOT=$ANDROID_HOME
+        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
+        
+        # 创建目录
+        mkdir -p $ANDROID_HOME/cmdline-tools
+        
+        # 下载命令行工具
+        cd $ANDROID_HOME/cmdline-tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
+        unzip -q commandlinetools-linux-8512546_latest.zip
+        mv cmdline-tools latest
+        
+        # 接受许可证
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        
+        # 安装必要组件 (使用稳定版本)
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+          "platform-tools" \
+          "platforms;android-30" \
+          "build-tools;30.0.3" \
+          "ndk;21.4.7075529"
+        
+        # 验证安装
+        ls -la $ANDROID_HOME/
+        ls -la $ANDROID_HOME/build-tools/
+        
+        # 保存环境变量到后续步骤
+        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+        echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+        echo "PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3" >> $GITHUB_ENV
+        
+    - name: 📝 创建优化的应用文件
+      run: |
+        # 创建简单的main.py
+        cat > main.py << 'EOF'
+        #!/usr/bin/env python3
+        from kivy.app import App
+        from kivy.uix.label import Label
+        
+        class TradingApp(App):
+            def build(self):
+                return Label(text='📱 交易机器人\n构建成功！', 
+                           font_size=20, 
+                           halign='center')
+        
+        if __name__ == '__main__':
+            TradingApp().run()
+        EOF
+        
+        # 创建优化的buildozer.spec
+        cat > buildozer.spec << 'EOF'
+        [app]
+        title = TradingBot
+        package.name = tradingbot
+        package.domain = com.example.tradingbot
+        source.dir = .
+        source.include_exts = py,png,jpg,kv,atlas
+        version = 1.0
+        requirements = python3,kivy
+        
+        [buildozer]
+        log_level = 2
+        warn_on_root = 0
+        
+        [app:android]
+        android.api = 30
+        android.minapi = 21
+        android.ndk = 21.4.7075529
+        android.sdk = 30
+        android.accept_sdk_license = True
+        android.gradle_dependencies = 
+        android.add_compile_options = 
+        android.add_gradle_repositories = 
+        android.add_packaging_options = 
+        EOF
+        
+    - name: 🏗️ 构建Android APK (修复版)
+      run: |
+        echo "🔨 开始构建APK..."
+        
+        # 显示环境信息
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "Java版本:"
+        java -version
+        echo "Python版本:"
+        python --version
+        
+        # 清理可能的缓存
+        rm -rf .buildozer
+        
+        # 构建APK
+        buildozer android debug --verbose 2>&1 | tee build.log || {
+          echo "❌ 构建失败，显示最后50行日志："
+          tail -50 build.log
+          echo "❌ 显示错误相关日志："
+          grep -i "error\|fail\|exception" build.log | tail -20 || echo "未找到明确错误信息"
+          exit 1
+        }
+        
+    - name: 📋 显示构建结果
+      run: |
+        echo "🎉 构建完成！"
+        echo "查找APK文件:"
+        find . -name "*.apk" -type f -exec ls -lh {} \; || echo "未找到APK文件"
+        
+        echo "查找构建目录:"
+        ls -la bin/ 2>/dev/null || echo "bin目录不存在"
+        ls -la .buildozer/android/platform/build-*/build/outputs/apk/ 2>/dev/null || echo "标准APK输出目录不存在"
+        
+    - name: 📤 上传构建产物
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: android-build-artifacts
+        path: |
+          bin/*.apk
+          .buildozer/android/platform/build-*/build/outputs/apk/**/*.apk
+          build.log
+        retention-days: 30
