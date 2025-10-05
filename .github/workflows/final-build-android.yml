@@ -69,7 +69,18 @@ jobs:
           unzip \
           autoconf \
           libtool \
-          pkg-config
+          libtool-bin \
+          automake \
+          pkg-config \
+          cmake \
+          ninja-build \
+          ccache \
+          libncurses5:i386 \
+          libstdc++6:i386 \
+          zlib1g:i386 \
+          openjdk-8-jdk \
+          wget \
+          curl
           
     - name: 🐍 安装Python依赖
       run: |
