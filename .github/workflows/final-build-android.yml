@@ -1,4 +1,4 @@
-name: 🤖 修复版Android构建
+name: 🤖 官方SDK版Android构建
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
 jobs:
   build-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     
     steps:
     - name: 📥 检出代码
@@ -25,7 +25,32 @@ jobs:
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '11'  # 改为Java 11，更稳定
+        java-version: '11'
+        
+    - name: 📱 使用官方Android Setup Action
+      uses: android-actions/setup-android@v3
+      with:
+        api-level: 30
+        build-tools: 30.0.3
+        ndk-version: 21.4.7075529
+        
+    - name: 🔧 验证Android环境
+      run: |
+        echo "=== Android环境验证 ==="
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+        
+        echo "=== SDK目录结构 ==="
+        ls -la $ANDROID_HOME/ || echo "ANDROID_HOME目录不存在"
+        
+        echo "=== Build Tools检查 ==="
+        ls -la $ANDROID_HOME/build-tools/ || echo "build-tools目录不存在"
+        
+        echo "=== 检查aidl工具 ==="
+        find $ANDROID_HOME -name "aidl" -type f 2>/dev/null | head -5
+        
+        echo "=== 环境变量 ==="
+        env | grep ANDROID
         
     - name: 📦 安装系统依赖
       run: |
@@ -42,8 +67,6 @@ jobs:
           libjpeg-dev \
           zlib1g-dev \
           unzip \
-          wget \
-          curl \
           autoconf \
           libtool \
           pkg-config
@@ -52,48 +75,12 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install wheel setuptools
-        pip install buildozer==1.4.0  # 固定版本
-        pip install cython==0.29.33   # 固定版本
+        pip install buildozer==1.4.0
+        pip install cython==0.29.33
         pip install kivy==2.1.0
         
-    - name: 📱 手动设置Android SDK (修复版)
+    - name: 📝 创建应用文件
       run: |
-        # 设置环境变量
-        export ANDROID_HOME=$HOME/android-sdk
-        export ANDROID_SDK_ROOT=$ANDROID_HOME
-        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3
-        
-        # 创建目录
-        mkdir -p $ANDROID_HOME/cmdline-tools
-        
-        # 下载命令行工具
-        cd $ANDROID_HOME/cmdline-tools
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
-        unzip -q commandlinetools-linux-8512546_latest.zip
-        mv cmdline-tools latest
-        
-        # 接受许可证
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        
-        # 安装必要组件 (使用稳定版本)
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-          "platform-tools" \
-          "platforms;android-30" \
-          "build-tools;30.0.3" \
-          "ndk;21.4.7075529"
-        
-        # 验证安装
-        ls -la $ANDROID_HOME/
-        ls -la $ANDROID_HOME/build-tools/
-        
-        # 保存环境变量到后续步骤
-        echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-        echo "PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3" >> $GITHUB_ENV
-        
-    - name: 📝 创建优化的应用文件
-      run: |
-        # 创建简单的main.py
         cat > main.py << 'EOF'
         #!/usr/bin/env python3
         from kivy.app import App
@@ -109,7 +96,6 @@ jobs:
             TradingApp().run()
         EOF
         
-        # 创建优化的buildozer.spec
         cat > buildozer.spec << 'EOF'
         [app]
         title = TradingBot
@@ -117,6 +103,7 @@ jobs:
         package.domain = com.example.tradingbot
         source.dir = .
         source.include_exts = py,png,jpg,kv,atlas
+        source.main = main.py
         version = 1.0
         requirements = python3,kivy
         
@@ -136,46 +123,102 @@ jobs:
         android.add_packaging_options = 
         EOF
         
-    - name: 🏗️ 构建Android APK (修复版)
+    - name: 🔧 修复buildozer Android路径
+      run: |
+        echo "=== 修复buildozer的Android SDK路径 ==="
+        
+        # 确保buildozer能找到Android SDK
+        mkdir -p ~/.buildozer/android/platform
+        
+        # 创建符号链接指向正确的SDK位置
+        if [ -d "$ANDROID_HOME" ]; then
+          ln -sf "$ANDROID_HOME" ~/.buildozer/android/platform/android-sdk
+          echo "✅ 创建SDK符号链接: $ANDROID_HOME -> ~/.buildozer/android/platform/android-sdk"
+        fi
+        
+        # 确保PATH包含所有必要的工具
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3:$PATH"
+        
+        echo "=== 最终环境检查 ==="
+        which aidl || echo "⚠️ aidl仍未在PATH中"
+        find $ANDROID_HOME -name "aidl" -type f | head -1 | xargs ls -la || echo "❌ 找不到aidl文件"
+        
+    - name: 🏗️ 构建Android APK
       run: |
         echo "🔨 开始构建APK..."
         
-        # 显示环境信息
+        echo "=== 最终环境信息 ==="
         echo "ANDROID_HOME: $ANDROID_HOME"
-        echo "Java版本:"
+        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
         java -version
-        echo "Python版本:"
         python --version
         
-        # 清理可能的缓存
+        # 确保PATH正确
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3:$PATH"
+        
+        echo "=== PATH检查 ==="
+        echo $PATH | tr ':' '\n' | grep android || echo "PATH中没有android相关路径"
+        
         rm -rf .buildozer
         
         # 构建APK
-        buildozer android debug --verbose 2>&1 | tee build.log || {
-          echo "❌ 构建失败，显示最后50行日志："
-          tail -50 build.log
-          echo "❌ 显示错误相关日志："
-          grep -i "error\|fail\|exception" build.log | tail -20 || echo "未找到明确错误信息"
+        buildozer android debug --verbose 2>&1 | tee build_complete.log || {
+          echo "❌ 构建失败！"
+          echo "=== 最后100行构建日志 ==="
+          tail -100 build_complete.log
+          echo "=== 搜索关键错误 ==="
+          grep -i "aidl\|error\|fail\|exception" build_complete.log | tail -20 || echo "未找到关键错误信息"
           exit 1
         }
         
-    - name: 📋 显示构建结果
+        echo "✅ 构建命令执行完成"
+        
+    - name: 🔍 超级详细APK搜索
       run: |
-        echo "🎉 构建完成！"
-        echo "查找APK文件:"
-        find . -name "*.apk" -type f -exec ls -lh {} \; || echo "未找到APK文件"
+        echo "🔍 开始超级详细APK搜索..."
         
-        echo "查找构建目录:"
-        ls -la bin/ 2>/dev/null || echo "bin目录不存在"
-        ls -la .buildozer/android/platform/build-*/build/outputs/apk/ 2>/dev/null || echo "标准APK输出目录不存在"
+        echo "=== 根目录搜索 ==="
+        find . -maxdepth 3 -name "*.apk" -type f 2>/dev/null | while read apk; do
+          echo "📱 根目录找到APK: $apk"
+          ls -lh "$apk"
+          file "$apk"
+        done
         
-    - name: 📤 上传构建产物
+        echo "=== 深度搜索所有APK ==="
+        find . -name "*.apk" -type f 2>/dev/null | head -20 | while read apk; do
+          echo "📱 深度搜索找到APK: $apk"
+          ls -lh "$apk"
+        done
+        
+        echo "=== 检查标准输出目录 ==="
+        for dir in "bin" ".buildozer/android/platform/build-*/build/outputs/apk" ".buildozer/android/platform/build-*/dist"; do
+          if [ -d "$dir" ] 2>/dev/null; then
+            echo "检查目录: $dir"
+            find "$dir" -name "*.apk" -type f 2>/dev/null | head -5
+          fi
+        done
+        
+        echo "=== 检查buildozer分发目录 ==="
+        find .buildozer -path "*/dist/*" -name "*.apk" -type f 2>/dev/null | head -10
+        
+        echo "=== 检查gradle输出 ==="
+        find .buildozer -path "*/outputs/apk*" -type d 2>/dev/null | while read dir; do
+          echo "Gradle输出目录: $dir"
+          ls -la "$dir/" 2>/dev/null | head -10
+        done
+        
+    - name: 📤 上传超级完整构建产物
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: android-build-artifacts
+        name: super-complete-android-build
         path: |
-          bin/*.apk
-          .buildozer/android/platform/build-*/build/outputs/apk/**/*.apk
-          build.log
+          **/*.apk
+          bin/
+          dist/
+          .buildozer/android/platform/build-*/build/outputs/
+          .buildozer/android/platform/build-*/dist/
+          build_complete.log
         retention-days: 30
+        
+    - name: 📋 最终构建报告
