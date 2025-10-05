@@ -134,6 +134,11 @@ jobs:
         if [ -d "$ANDROID_HOME" ]; then
           ln -sf "$ANDROID_HOME" ~/.buildozer/android/platform/android-sdk
           echo "✅ 创建SDK符号链接: $ANDROID_HOME -> ~/.buildozer/android/platform/android-sdk"
+          
+          # 创建tools目录和sdkmanager的符号链接（兼容旧版buildozer）
+          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
+          ln -sf "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+          echo "✅ 创建sdkmanager符号链接以兼容旧版buildozer"
         fi
         
         # 确保PATH包含所有必要的工具
@@ -142,6 +147,9 @@ jobs:
         echo "=== 最终环境检查 ==="
         which aidl || echo "⚠️ aidl仍未在PATH中"
         find $ANDROID_HOME -name "aidl" -type f | head -1 | xargs ls -la || echo "❌ 找不到aidl文件"
+        
+        echo "=== 验证sdkmanager链接 ==="
+        ls -la ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager || echo "sdkmanager链接不存在"
         
     - name: 🏗️ 构建Android APK
       run: |
