@@ -121,7 +121,7 @@ jobs:
         package.name = tradingbot
         package.domain = com.example.tradingbot
         source.dir = .
-        source.include_exts = py,png,jpg,kv,atlas
+        source.include_exts = py
         source.main = main.py
         version = 1.0
         requirements = python3,kivy
@@ -137,12 +137,7 @@ jobs:
         android.sdk = 30
         android.accept_sdk_license = True
         android.arch = arm64-v8a
-        android.release_artifact = aab
         android.debug_artifact = apk
-        android.gradle_dependencies = 
-        android.add_compile_options = 
-        android.add_gradle_repositories = 
-        android.add_packaging_options = 
         EOF
         
     - name: 🔧 修复buildozer Android路径
@@ -198,9 +193,18 @@ jobs:
         rm -rf ~/.buildozer/android/packages
         rm -rf ~/.buildozer/cache
         
-        # 构建APK - 强制单架构
-        echo "🚀 开始buildozer构建（强制单架构）..."
-        buildozer android debug --arch arm64-v8a --verbose 2>&1 | tee build_complete.log || {
+        # 构建APK - 使用环境变量强制单架构
+        echo "🚀 开始buildozer构建（环境变量强制单架构）..."
+        
+        # 设置强制环境变量
+        export P4A_ARCH=arm64-v8a
+        export BUILDOZER_ARCH=arm64-v8a
+        
+        echo "=== 强制架构环境变量 ==="
+        echo "P4A_ARCH: $P4A_ARCH"
+        echo "BUILDOZER_ARCH: $BUILDOZER_ARCH"
+        
+        buildozer android debug --verbose 2>&1 | tee build_complete.log || {
           echo "❌ 构建失败！"
           echo "=== 最后200行构建日志 ==="
           tail -200 build_complete.log
