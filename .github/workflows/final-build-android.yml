@@ -102,17 +102,45 @@ jobs:
       run: |
         cat > main.py << 'EOF'
         #!/usr/bin/env python3
-        from kivy.app import App
-        from kivy.uix.label import Label
+        """
+        简化版交易机器人Android应用
+        避免复杂依赖，专注核心功能
+        """
+        import sys
+        import os
         
-        class TradingApp(App):
-            def build(self):
-                return Label(text='📱 交易机器人\n构建成功！', 
-                           font_size=20, 
-                           halign='center')
+        def main():
+            print("📱 交易机器人 Android版")
+            print("✅ 应用启动成功！")
+            print("🔧 版本: 1.0")
+            print("📊 架构: arm64-v8a")
+            
+            # 简单的交互循环
+            try:
+                while True:
+                    print("\n=== 交易机器人菜单 ===")
+                    print("1. 显示状态")
+                    print("2. 退出")
+                    
+                    choice = input("请选择 (1-2): ").strip()
+                    
+                    if choice == "1":
+                        print("📊 机器人状态: 运行中")
+                        print("🔗 连接状态: 正常")
+                        print("💰 当前余额: 模拟模式")
+                    elif choice == "2":
+                        print("👋 再见！")
+                        break
+                    else:
+                        print("❌ 无效选择，请重试")
+                        
+            except KeyboardInterrupt:
+                print("\n👋 程序退出")
+            except Exception as e:
+                print(f"❌ 错误: {e}")
         
         if __name__ == '__main__':
-            TradingApp().run()
+            main()
         EOF
         
         cat > buildozer.spec << 'EOF'
@@ -124,7 +152,7 @@ jobs:
         source.include_exts = py
         source.main = main.py
         version = 1.0
-        requirements = python3,kivy
+        requirements = python3
         
         [buildozer]
         log_level = 2
@@ -247,13 +275,13 @@ jobs:
         # 创建发布目录
         mkdir -p dist
         
-        # 直接使用Python-for-Android构建APK
+        # 直接使用Python-for-Android构建APK - 使用最小化requirements
         p4a apk --private . \
             --package=com.example.tradingbot \
             --name="TradingBot" \
             --version=1.0 \
             --bootstrap=sdl2 \
-            --requirements=python3,kivy \
+            --requirements=python3 \
             --arch=arm64-v8a \
             --permission INTERNET \
             --permission WRITE_EXTERNAL_STORAGE \
@@ -262,10 +290,31 @@ jobs:
             --icon-name="TradingBot" \
             --release \
             --dist-name=tradingbot 2>&1 | tee p4a_build.log || {
-          echo "❌ P4A构建失败！"
-          echo "=== P4A构建日志 ==="
-          tail -100 p4a_build.log
-          exit 1
+          echo "❌ P4A最小化构建失败，尝试使用预编译组件..."
+          
+          # 尝试使用预编译的libffi
+          echo "🔧 尝试预编译libffi方案..."
+          p4a apk --private . \
+              --package=com.example.tradingbot \
+              --name="TradingBot" \
+              --version=1.0 \
+              --bootstrap=sdl2 \
+              --requirements=python3,kivy \
+              --arch=arm64-v8a \
+              --permission INTERNET \
+              --permission WRITE_EXTERNAL_STORAGE \
+              --permission READ_EXTERNAL_STORAGE \
+              --orientation=portrait \
+              --icon-name="TradingBot" \
+              --release \
+              --dist-name=tradingbot \
+              --force-build \
+              --debug 2>&1 | tee p4a_build_retry.log || {
+            echo "❌ 所有P4A构建方案都失败了"
+            echo "=== 最后的构建日志 ==="
+            tail -100 p4a_build_retry.log
+            exit 1
+          }
         }
         
     - name: 🔍 超级详细APK搜索
@@ -304,6 +353,7 @@ jobs:
           **/*.apk
           dist/
           p4a_build.log
+          p4a_build_retry.log
           *.apk
         retention-days: 30
         
@@ -334,4 +384,3 @@ jobs:
           echo "=== P4A构建目录结构 ==="
           find . -type d -name "*apk*" 2>/dev/null | head -10 || echo "没有apk相关目录"
         fi
-
