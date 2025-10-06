@@ -193,64 +193,71 @@ jobs:
         rm -rf ~/.buildozer/android/packages
         rm -rf ~/.buildozer/cache
         
-        # 构建APK - 使用环境变量强制单架构
-        echo "🚀 开始buildozer构建（环境变量强制单架构）..."
+        # 🚀 终极方案：直接使用Python-for-Android绕过buildozer
+        echo "🔥 buildozer无视所有架构设置，直接使用Python-for-Android！"
         
-        # 设置强制环境变量
-        export P4A_ARCH=arm64-v8a
-        export BUILDOZER_ARCH=arm64-v8a
+        # 安装Python-for-Android
+        pip install python-for-android
         
-        echo "=== 强制架构环境变量 ==="
-        echo "P4A_ARCH: $P4A_ARCH"
-        echo "BUILDOZER_ARCH: $BUILDOZER_ARCH"
+        # 设置环境变量
+        export ANDROID_HOME=/usr/local/lib/android/sdk
+        export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+        export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk/21.4.7075529
+        export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3:$PATH"
         
-        buildozer android debug --verbose 2>&1 | tee build_complete.log || {
-          echo "❌ 构建失败！"
-          echo "=== 最后200行构建日志 ==="
-          tail -200 build_complete.log
-          echo ""
-          echo "=== 搜索关键错误 ==="
-          grep -i "error\|fail\|exception\|traceback" build_complete.log | tail -30 || echo "未找到关键错误信息"
-          echo ""
-          echo "=== Python-for-Android相关错误 ==="
-          grep -i "pythonforandroid\|p4a" build_complete.log | tail -20 || echo "未找到p4a相关错误"
+        echo "=== 直接使用P4A构建 ==="
+        echo "ANDROID_HOME: $ANDROID_HOME"
+        echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
+        
+        # 创建发布目录
+        mkdir -p dist
+        
+        # 直接使用Python-for-Android构建APK
+        p4a apk --private . \
+            --package=com.example.tradingbot \
+            --name="TradingBot" \
+            --version=1.0 \
+            --bootstrap=sdl2 \
+            --requirements=python3,kivy \
+            --arch=arm64-v8a \
+            --permission INTERNET \
+            --permission WRITE_EXTERNAL_STORAGE \
+            --permission READ_EXTERNAL_STORAGE \
+            --orientation=portrait \
+            --icon-name="TradingBot" \
+            --release \
+            --dist-name=tradingbot 2>&1 | tee p4a_build.log || {
+          echo "❌ P4A构建失败！"
+          echo "=== P4A构建日志 ==="
+          tail -100 p4a_build.log
           exit 1
         }
         
-        echo "✅ 构建命令执行完成"
-        
     - name: 🔍 超级详细APK搜索
       run: |
-        echo "🔍 开始超级详细APK搜索..."
+        echo "🔍 开始P4A APK搜索..."
         
-        echo "=== 根目录搜索 ==="
-        find . -maxdepth 3 -name "*.apk" -type f 2>/dev/null | while read apk; do
-          echo "📱 根目录找到APK: $apk"
+        echo "=== P4A标准输出目录 ==="
+        find . -name "*.apk" -type f 2>/dev/null | while read apk; do
+          echo "📱 找到APK: $apk"
           ls -lh "$apk"
           file "$apk"
         done
+        
+        echo "=== 检查dist目录 ==="
+        if [ -d "dist" ]; then
+          echo "dist目录内容:"
+          ls -la dist/
+          find dist -name "*.apk" -type f 2>/dev/null
+        fi
+        
+        echo "=== 检查当前目录 ==="
+        ls -la *.apk 2>/dev/null || echo "当前目录无APK文件"
         
         echo "=== 深度搜索所有APK ==="
         find . -name "*.apk" -type f 2>/dev/null | head -20 | while read apk; do
           echo "📱 深度搜索找到APK: $apk"
           ls -lh "$apk"
-        done
-        
-        echo "=== 检查标准输出目录 ==="
-        for dir in "bin" ".buildozer/android/platform/build-*/build/outputs/apk" ".buildozer/android/platform/build-*/dist"; do
-          if [ -d "$dir" ] 2>/dev/null; then
-            echo "检查目录: $dir"
-            find "$dir" -name "*.apk" -type f 2>/dev/null | head -5
-          fi
-        done
-        
-        echo "=== 检查buildozer分发目录 ==="
-        find .buildozer -path "*/dist/*" -name "*.apk" -type f 2>/dev/null | head -10
-        
-        echo "=== 检查gradle输出 ==="
-        find .buildozer -path "*/outputs/apk*" -type d 2>/dev/null | while read dir; do
-          echo "Gradle输出目录: $dir"
-          ls -la "$dir/" 2>/dev/null | head -10
         done
         
     - name: 📤 上传超级完整构建产物
@@ -260,24 +267,22 @@ jobs:
         name: super-complete-android-build
         path: |
           **/*.apk
-          bin/
           dist/
-          .buildozer/android/platform/build-*/build/outputs/
-          .buildozer/android/platform/build-*/dist/
-          build_complete.log
+          p4a_build.log
+          *.apk
         retention-days: 30
         
     - name: 📋 最终构建报告
       if: always()
       run: |
-        echo "📊 最终构建报告"
+        echo "📊 P4A构建最终报告"
         echo "=================="
         
         total_apks=$(find . -name "*.apk" -type f 2>/dev/null | wc -l)
         echo "🎯 总共找到APK文件: $total_apks 个"
         
         if [ $total_apks -gt 0 ]; then
-          echo "✅ 🎉 APK构建成功！"
+          echo "✅ 🎉 APK构建成功！直接使用P4A绕过了buildozer的BUG！"
           echo "=== APK文件列表 ==="
           find . -name "*.apk" -type f -exec ls -lh {} \; | head -10
           
@@ -287,11 +292,11 @@ jobs:
           echo "❌ 仍然未找到APK文件"
           echo ""
           echo "🔍 可能的原因和调试信息："
-          echo "1. 检查上传的 build_complete.log 文件"
-          echo "2. 构建可能在某个隐藏步骤失败了"
-          echo "3. APK可能生成在了非标准位置"
+          echo "1. 检查上传的 p4a_build.log 文件"
+          echo "2. P4A构建可能在某个步骤失败了"
+          echo "3. 需要检查P4A的具体错误信息"
           echo ""
-          echo "=== buildozer目录结构 ==="
-          find .buildozer -type d -name "*apk*" 2>/dev/null | head -10 || echo "没有apk相关目录"
+          echo "=== P4A构建目录结构 ==="
+          find . -type d -name "*apk*" 2>/dev/null | head -10 || echo "没有apk相关目录"
         fi
 
