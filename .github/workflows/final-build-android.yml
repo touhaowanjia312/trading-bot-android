@@ -136,6 +136,7 @@ jobs:
         android.ndk = 21.4.7075529
         android.sdk = 30
         android.accept_sdk_license = True
+        android.arch = arm64-v8a
         android.gradle_dependencies = 
         android.add_compile_options = 
         android.add_gradle_repositories = 
@@ -186,15 +187,24 @@ jobs:
         echo "=== PATH检查 ==="
         echo $PATH | tr ':' '\n' | grep android || echo "PATH中没有android相关路径"
         
+        # 显示buildozer配置
+        echo "=== Buildozer配置 ==="
+        cat buildozer.spec
+        
         rm -rf .buildozer
         
-        # 构建APK
+        # 构建APK - 使用更详细的日志
+        echo "🚀 开始buildozer构建..."
         buildozer android debug --verbose 2>&1 | tee build_complete.log || {
           echo "❌ 构建失败！"
-          echo "=== 最后100行构建日志 ==="
-          tail -100 build_complete.log
+          echo "=== 最后200行构建日志 ==="
+          tail -200 build_complete.log
+          echo ""
           echo "=== 搜索关键错误 ==="
-          grep -i "aidl\|error\|fail\|exception" build_complete.log | tail -20 || echo "未找到关键错误信息"
+          grep -i "error\|fail\|exception\|traceback" build_complete.log | tail -30 || echo "未找到关键错误信息"
+          echo ""
+          echo "=== Python-for-Android相关错误 ==="
+          grep -i "pythonforandroid\|p4a" build_complete.log | tail -20 || echo "未找到p4a相关错误"
           exit 1
         }
         
