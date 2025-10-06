@@ -137,6 +137,8 @@ jobs:
         android.sdk = 30
         android.accept_sdk_license = True
         android.arch = arm64-v8a
+        android.release_artifact = aab
+        android.debug_artifact = apk
         android.gradle_dependencies = 
         android.add_compile_options = 
         android.add_gradle_repositories = 
@@ -191,11 +193,14 @@ jobs:
         echo "=== Buildozer配置 ==="
         cat buildozer.spec
         
+        # 完全清理所有缓存
         rm -rf .buildozer
+        rm -rf ~/.buildozer/android/packages
+        rm -rf ~/.buildozer/cache
         
-        # 构建APK - 使用更详细的日志
-        echo "🚀 开始buildozer构建..."
-        buildozer android debug --verbose 2>&1 | tee build_complete.log || {
+        # 构建APK - 强制单架构
+        echo "🚀 开始buildozer构建（强制单架构）..."
+        buildozer android debug --arch arm64-v8a --verbose 2>&1 | tee build_complete.log || {
           echo "❌ 构建失败！"
           echo "=== 最后200行构建日志 ==="
           tail -200 build_complete.log
@@ -285,3 +290,4 @@ jobs:
           echo "=== buildozer目录结构 ==="
           find .buildozer -type d -name "*apk*" 2>/dev/null | head -10 || echo "没有apk相关目录"
         fi
+
