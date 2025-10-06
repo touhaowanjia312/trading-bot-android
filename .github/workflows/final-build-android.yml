@@ -103,41 +103,143 @@ jobs:
         cat > main.py << 'EOF'
         #!/usr/bin/env python3
         """
-        简化版交易机器人Android应用
-        避免复杂依赖，专注核心功能
+        WebView版交易机器人Android应用
+        使用HTML界面，避免复杂的原生依赖
         """
         import sys
         import os
         
-        def main():
-            print("📱 交易机器人 Android版")
-            print("✅ 应用启动成功！")
-            print("🔧 版本: 1.0")
-            print("📊 架构: arm64-v8a")
+        # 创建简单的HTML界面
+        html_content = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>交易机器人</title>
+            <style>
+                body { 
+                    font-family: Arial, sans-serif; 
+                    margin: 20px; 
+                    background: #f0f0f0;
+                }
+                .container { 
+                    max-width: 400px; 
+                    margin: 0 auto; 
+                    background: white; 
+                    padding: 20px; 
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                }
+                h1 { 
+                    color: #333; 
+                    text-align: center;
+                    margin-bottom: 30px;
+                }
+                .status { 
+                    background: #e8f5e8; 
+                    padding: 15px; 
+                    border-radius: 5px; 
+                    margin: 10px 0;
+                    border-left: 4px solid #4CAF50;
+                }
+                .button { 
+                    background: #4CAF50; 
+                    color: white; 
+                    padding: 12px 24px; 
+                    border: none; 
+                    border-radius: 5px; 
+                    cursor: pointer;
+                    width: 100%;
+                    margin: 10px 0;
+                    font-size: 16px;
+                }
+                .button:hover { 
+                    background: #45a049; 
+                }
+                .info { 
+                    color: #666; 
+                    font-size: 14px;
+                    text-align: center;
+                    margin-top: 20px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <h1>📱 交易机器人</h1>
+                <div class="status">
+                    <strong>✅ 应用状态:</strong> 运行中<br>
+                    <strong>🔧 版本:</strong> 1.0<br>
+                    <strong>📊 架构:</strong> arm64-v8a<br>
+                    <strong>🌐 界面:</strong> WebView
+                </div>
+                <button class="button" onclick="showStatus()">📊 显示状态</button>
+                <button class="button" onclick="showInfo()">ℹ️ 应用信息</button>
+                <div id="output" class="status" style="display:none;">
+                    <div id="outputText"></div>
+                </div>
+                <div class="info">
+                    交易机器人 Android版<br>
+                    构建成功！🎉
+                </div>
+            </div>
             
-            # 简单的交互循环
+            <script>
+                function showStatus() {
+                    const output = document.getElementById('output');
+                    const text = document.getElementById('outputText');
+                    text.innerHTML = `
+                        <strong>📊 机器人状态:</strong> 运行中<br>
+                        <strong>🔗 连接状态:</strong> 正常<br>
+                        <strong>💰 当前余额:</strong> 模拟模式<br>
+                        <strong>⏰ 更新时间:</strong> ${new Date().toLocaleString()}
+                    `;
+                    output.style.display = 'block';
+                }
+                
+                function showInfo() {
+                    const output = document.getElementById('output');
+                    const text = document.getElementById('outputText');
+                    text.innerHTML = `
+                        <strong>📱 应用名称:</strong> 交易机器人<br>
+                        <strong>🔧 版本:</strong> 1.0<br>
+                        <strong>🏗️ 构建方式:</strong> Python-for-Android<br>
+                        <strong>🌐 界面技术:</strong> WebView + HTML<br>
+                        <strong>📊 架构:</strong> arm64-v8a
+                    `;
+                    output.style.display = 'block';
+                }
+            </script>
+        </body>
+        </html>
+        """
+        
+        def main():
+            print("📱 交易机器人 WebView版启动")
+            
+            # 为webview bootstrap创建HTML文件
             try:
-                while True:
-                    print("\n=== 交易机器人菜单 ===")
-                    print("1. 显示状态")
-                    print("2. 退出")
-                    
-                    choice = input("请选择 (1-2): ").strip()
-                    
-                    if choice == "1":
-                        print("📊 机器人状态: 运行中")
-                        print("🔗 连接状态: 正常")
-                        print("💰 当前余额: 模拟模式")
-                    elif choice == "2":
-                        print("👋 再见！")
-                        break
-                    else:
-                        print("❌ 无效选择，请重试")
-                        
-            except KeyboardInterrupt:
-                print("\n👋 程序退出")
+                with open('index.html', 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                print("✅ HTML界面文件已创建")
             except Exception as e:
-                print(f"❌ 错误: {e}")
+                print(f"❌ 创建HTML文件失败: {e}")
+            
+            print("🌐 WebView应用已准备就绪")
+            print("📊 应用信息:")
+            print("  - 名称: 交易机器人")
+            print("  - 版本: 1.0")
+            print("  - 架构: arm64-v8a")
+            print("  - 界面: WebView + HTML")
+            
+            # 保持应用运行
+            try:
+                import time
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("\n👋 应用退出")
         
         if __name__ == '__main__':
             main()
@@ -275,12 +377,12 @@ jobs:
         # 创建发布目录
         mkdir -p dist
         
-        # 直接使用Python-for-Android构建APK - 使用最小化requirements
+        # 直接使用Python-for-Android构建APK - 使用webview bootstrap避免SDL2依赖
         p4a apk --private . \
             --package=com.example.tradingbot \
             --name="TradingBot" \
             --version=1.0 \
-            --bootstrap=sdl2 \
+            --bootstrap=webview \
             --requirements=python3 \
             --arch=arm64-v8a \
             --permission INTERNET \
@@ -290,16 +392,16 @@ jobs:
             --icon-name="TradingBot" \
             --release \
             --dist-name=tradingbot 2>&1 | tee p4a_build.log || {
-          echo "❌ P4A最小化构建失败，尝试使用预编译组件..."
+          echo "❌ P4A webview构建失败，尝试service_only bootstrap..."
           
-          # 尝试使用预编译的libffi
-          echo "🔧 尝试预编译libffi方案..."
+          # 尝试使用service_only bootstrap - 纯后台服务
+          echo "🔧 尝试service_only bootstrap方案..."
           p4a apk --private . \
               --package=com.example.tradingbot \
               --name="TradingBot" \
               --version=1.0 \
-              --bootstrap=sdl2 \
-              --requirements=python3,kivy \
+              --bootstrap=service_only \
+              --requirements=python3 \
               --arch=arm64-v8a \
               --permission INTERNET \
               --permission WRITE_EXTERNAL_STORAGE \
@@ -308,7 +410,6 @@ jobs:
               --icon-name="TradingBot" \
               --release \
               --dist-name=tradingbot \
-              --force-build \
               --debug 2>&1 | tee p4a_build_retry.log || {
             echo "❌ 所有P4A构建方案都失败了"
             echo "=== 最后的构建日志 ==="
