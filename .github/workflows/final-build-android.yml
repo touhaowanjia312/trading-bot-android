@@ -133,7 +133,7 @@ jobs:
         [app:android]
         android.api = 30
         android.minapi = 21
-        android.ndk = 21.4.7075529
+        android.ndk = 28.2.13676358
         android.sdk = 30
         android.accept_sdk_license = True
         android.arch = arm64-v8a
@@ -199,15 +199,36 @@ jobs:
         # 安装Python-for-Android
         pip install python-for-android
         
-        # 设置环境变量
+        # 设置环境变量 - 使用最新的NDK版本
         export ANDROID_HOME=/usr/local/lib/android/sdk
         export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
-        export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk/21.4.7075529
+        export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk/28.2.13676358
         export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/build-tools/30.0.3:$PATH"
         
         echo "=== 直接使用P4A构建 ==="
         echo "ANDROID_HOME: $ANDROID_HOME"
         echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
+        
+        echo "=== 验证NDK版本 ==="
+        ls -la /usr/local/lib/android/sdk/ndk/ || echo "NDK目录不存在"
+        
+        echo "=== 检查NDK 28版本 ==="
+        if [ -d "/usr/local/lib/android/sdk/ndk/28.2.13676358" ]; then
+          echo "✅ NDK 28.2.13676358 存在"
+          ls -la /usr/local/lib/android/sdk/ndk/28.2.13676358/ | head -10
+        else
+          echo "❌ NDK 28.2.13676358 不存在，尝试其他版本"
+          echo "可用的NDK版本："
+          ls -la /usr/local/lib/android/sdk/ndk/
+          # 尝试使用任何可用的NDK 25+版本
+          for ndk_dir in /usr/local/lib/android/sdk/ndk/*/; do
+            if [[ "$ndk_dir" =~ ndk/([0-9]+) ]] && [ "${BASH_REMATCH[1]}" -ge 25 ]; then
+              echo "🔄 使用NDK版本: $ndk_dir"
+              export ANDROID_NDK_HOME="$ndk_dir"
+              break
+            fi
+          done
+        fi
         
         # 创建发布目录
         mkdir -p dist
@@ -299,4 +320,3 @@ jobs:
           echo "=== P4A构建目录结构 ==="
           find . -type d -name "*apk*" 2>/dev/null | head -10 || echo "没有apk相关目录"
         fi
-
