@@ -426,10 +426,48 @@ jobs:
         PATCH_PID=$!
         echo "🚀 libffi修补程序已启动 (PID: $PATCH_PID)"
         
-        # 🔥 终极方案：完全跳过libffi - 使用预编译的python3 recipe
-        echo "🎯 使用service_only bootstrap - 完全避开GUI依赖和libffi问题"
+        # 🔥 终极方案：分步构建 - 先创建dist，再打包APK
+        echo "🎯 采用分步构建策略 - 更容易调试"
         
-        # 方案1：使用service_only（最简单，无GUI）
+        # 步骤1：创建distribution（只编译必要的库）
+        echo "📦 步骤1：创建Python for Android distribution..."
+        
+        # 🔧 禁用ccache避免编译错误
+        export USE_CCACHE=0
+        export NDK_CCACHE=""
+        unset CCACHE_DIR
+        
+        # 🔧 确保使用正确的编译器
+        export CC="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+        export CXX="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++"
+        
+        echo "=== 编译环境设置 ==="
+        echo "USE_CCACHE: $USE_CCACHE"
+        echo "CC: $CC"
+        echo "CXX: $CXX"
+        
+        p4a create --dist-name tradingbot \
+            --bootstrap=service_only \
+            --requirements=python3 \
+            --arch=arm64-v8a \
+            --force-build \
+            --ndk-api=21 2>&1 | tee p4a_create.log || {
+          echo "❌ Distribution创建失败"
+          echo "=== 错误日志（最后150行）==="
+          tail -150 p4a_create.log
+          
+          # 尝试使用已有的distribution（如果存在）
+          echo ""
+          echo "🔄 尝试列出已有的distributions..."
+          p4a distributions || echo "无法列出distributions"
+          
+          echo ""
+          echo "💡 尝试使用现有distribution强制构建APK..."
+        }
+        
+        # 步骤2：基于distribution创建APK
+        echo ""
+        echo "📱 步骤2：基于distribution创建APK..."
         p4a apk --private . \
             --package=com.example.tradingbot \
             --name="TradingBot" \
@@ -441,12 +479,15 @@ jobs:
             --permission WRITE_EXTERNAL_STORAGE \
             --permission READ_EXTERNAL_STORAGE \
             --dist-name=tradingbot \
-            --debug 2>&1 | tee p4a_build.log || {
-          echo "❌ P4A service_only构建失败"
-          echo "=== 构建日志（最后100行）==="
-          tail -100 p4a_build.log
+            --debug 2>&1 | tee p4a_apk.log || {
+          echo "❌ APK打包失败"
+          echo "=== APK打包日志（最后100行）==="
+          tail -100 p4a_apk.log
           exit 1
         }
+        
+        echo ""
+        echo "✅ 构建流程完成！开始搜索APK..."
         
     - name: 🔍 超级详细APK搜索
       run: |
@@ -492,8 +533,8 @@ jobs:
         path: |
           **/*.apk
           dist/
-          p4a_build.log
-          p4a_build_retry.log
+          p4a_create.log
+          p4a_apk.log
           /tmp/patch_libffi.log
           *.apk
         retention-days: 30
