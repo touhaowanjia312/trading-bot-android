@@ -377,7 +377,42 @@ jobs:
         # 创建发布目录
         mkdir -p dist
         
-        # 直接使用Python-for-Android构建APK - 使用webview bootstrap避免SDL2依赖
+        # 🔥 终极方案：降级libffi到3.2.1（不需要LT_SYS_SYMBOL_USCORE宏）
+        echo "🔥 使用较旧但稳定的libffi 3.2.1版本..."
+        
+        # 创建自定义libffi recipe来使用3.2.1版本
+        mkdir -p ~/.local/lib/python3.9/site-packages/pythonforandroid/recipes/libffi
+        cat > ~/.local/lib/python3.9/site-packages/pythonforandroid/recipes/libffi/__init__.py << 'LIBFFI_RECIPE'
+        from pythonforandroid.recipe import Recipe
+        from pythonforandroid.util import current_directory
+        from pythonforandroid.logger import shprint
+        from os.path import join
+        import sh
+        
+        class LibffiRecipe(Recipe):
+            version = '3.2.1'
+            url = 'https://github.com/libffi/libffi/archive/v{version}.tar.gz'
+            patches = ['remove-version-info.patch']
+            
+            def build_arch(self, arch):
+                super().build_arch(arch)
+                env = self.get_recipe_env(arch)
+                with current_directory(self.get_build_dir(arch.arch)):
+                    shprint(sh.Command('./autogen.sh'), _env=env)
+                    shprint(sh.Command('./configure'),
+                            '--host=' + arch.command_prefix,
+                            '--prefix=' + self.ctx.get_python_install_dir(arch.arch),
+                            '--disable-builddir',
+                            '--enable-shared', _env=env)
+                    shprint(sh.make, '-j', str(self.ctx.num_cores), _env=env)
+                    shprint(sh.make, 'install', _env=env)
+        
+        recipe = LibffiRecipe()
+        LIBFFI_RECIPE
+        
+        echo "✅ 已创建自定义libffi 3.2.1 recipe"
+        
+        # 直接使用Python-for-Android构建APK - 使用webview bootstrap避免SDL2依赖  
         p4a apk --private . \
             --package=com.example.tradingbot \
             --name="TradingBot" \
