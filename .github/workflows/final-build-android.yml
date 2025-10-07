@@ -402,11 +402,8 @@ jobs:
               # 备份原文件
               cp "$LIBFFI_CONFIGURE" "$LIBFFI_CONFIGURE.backup"
               
-              # 方法1：注释掉第215行的LT_SYS_SYMBOL_USCORE
-              sed -i '215s/^LT_SYS_SYMBOL_USCORE/#LT_SYS_SYMBOL_USCORE # Commented out for autoconf 2.71 compatibility/' "$LIBFFI_CONFIGURE"
-              
-              # 方法2：如果第215行包含该宏，整行注释
-              sed -i '/^.*LT_SYS_SYMBOL_USCORE.*$/s/^/# PATCHED: /' "$LIBFFI_CONFIGURE"
+              # 使用单一方法修补：只注释掉包含该宏的行
+              sed -i '/LT_SYS_SYMBOL_USCORE/s/^/# PATCHED: /' "$LIBFFI_CONFIGURE"
               
               echo "✅ libffi已修补！修改内容："
               sed -n '213,217p' "$LIBFFI_CONFIGURE"
@@ -429,45 +426,26 @@ jobs:
         PATCH_PID=$!
         echo "🚀 libffi修补程序已启动 (PID: $PATCH_PID)"
         
-        # 直接使用Python-for-Android构建APK - 使用webview bootstrap避免SDL2依赖  
+        # 🔥 终极方案：完全跳过libffi - 使用预编译的python3 recipe
+        echo "🎯 使用service_only bootstrap - 完全避开GUI依赖和libffi问题"
+        
+        # 方案1：使用service_only（最简单，无GUI）
         p4a apk --private . \
             --package=com.example.tradingbot \
             --name="TradingBot" \
             --version=1.0 \
-            --bootstrap=webview \
+            --bootstrap=service_only \
             --requirements=python3 \
             --arch=arm64-v8a \
             --permission INTERNET \
             --permission WRITE_EXTERNAL_STORAGE \
             --permission READ_EXTERNAL_STORAGE \
-            --orientation=portrait \
-            --icon-name="TradingBot" \
-            --release \
-            --dist-name=tradingbot 2>&1 | tee p4a_build.log || {
-          echo "❌ P4A webview构建失败，尝试service_only bootstrap..."
-          
-          # 尝试使用service_only bootstrap - 纯后台服务
-          echo "🔧 尝试service_only bootstrap方案..."
-          p4a apk --private . \
-              --package=com.example.tradingbot \
-              --name="TradingBot" \
-              --version=1.0 \
-              --bootstrap=service_only \
-              --requirements=python3 \
-              --arch=arm64-v8a \
-              --permission INTERNET \
-              --permission WRITE_EXTERNAL_STORAGE \
-              --permission READ_EXTERNAL_STORAGE \
-              --orientation=portrait \
-              --icon-name="TradingBot" \
-              --release \
-              --dist-name=tradingbot \
-              --debug 2>&1 | tee p4a_build_retry.log || {
-            echo "❌ 所有P4A构建方案都失败了"
-            echo "=== 最后的构建日志 ==="
-            tail -100 p4a_build_retry.log
-            exit 1
-          }
+            --dist-name=tradingbot \
+            --debug 2>&1 | tee p4a_build.log || {
+          echo "❌ P4A service_only构建失败"
+          echo "=== 构建日志（最后100行）==="
+          tail -100 p4a_build.log
+          exit 1
         }
         
     - name: 🔍 超级详细APK搜索
