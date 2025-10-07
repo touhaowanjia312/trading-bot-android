@@ -377,40 +377,57 @@ jobs:
         # 创建发布目录
         mkdir -p dist
         
-        # 🔥 终极方案：降级libffi到3.2.1（不需要LT_SYS_SYMBOL_USCORE宏）
-        echo "🔥 使用较旧但稳定的libffi 3.2.1版本..."
+        # 🔥 终极方案：创建后台任务实时修补libffi的configure.ac
+        echo "🔥 创建libffi自动修补程序..."
         
-        # 创建自定义libffi recipe来使用3.2.1版本
-        mkdir -p ~/.local/lib/python3.9/site-packages/pythonforandroid/recipes/libffi
-        cat > ~/.local/lib/python3.9/site-packages/pythonforandroid/recipes/libffi/__init__.py << 'LIBFFI_RECIPE'
-        from pythonforandroid.recipe import Recipe
-        from pythonforandroid.util import current_directory
-        from pythonforandroid.logger import shprint
-        from os.path import join
-        import sh
+        # 创建修补脚本
+        cat > /tmp/patch_libffi.sh << 'PATCHSCRIPT'
+        #!/bin/bash
+        # 持续监控并修补libffi
+        echo "🔧 启动libffi监控修补程序..."
         
-        class LibffiRecipe(Recipe):
-            version = '3.2.1'
-            url = 'https://github.com/libffi/libffi/archive/v{version}.tar.gz'
-            patches = ['remove-version-info.patch']
+        for i in {1..60}; do
+          sleep 2
+          
+          # 查找libffi的configure.ac文件
+          LIBFFI_CONFIGURE=$(find ~/.local/share/python-for-android/build/other_builds/libffi -name "configure.ac" -type f 2>/dev/null | head -1)
+          
+          if [ -n "$LIBFFI_CONFIGURE" ] && [ -f "$LIBFFI_CONFIGURE" ]; then
+            echo "✅ 找到libffi configure.ac: $LIBFFI_CONFIGURE"
             
-            def build_arch(self, arch):
-                super().build_arch(arch)
-                env = self.get_recipe_env(arch)
-                with current_directory(self.get_build_dir(arch.arch)):
-                    shprint(sh.Command('./autogen.sh'), _env=env)
-                    shprint(sh.Command('./configure'),
-                            '--host=' + arch.command_prefix,
-                            '--prefix=' + self.ctx.get_python_install_dir(arch.arch),
-                            '--disable-builddir',
-                            '--enable-shared', _env=env)
-                    shprint(sh.make, '-j', str(self.ctx.num_cores), _env=env)
-                    shprint(sh.make, 'install', _env=env)
+            # 检查是否已修补
+            if grep -q "LT_SYS_SYMBOL_USCORE" "$LIBFFI_CONFIGURE"; then
+              echo "🔧 修补libffi configure.ac - 移除有问题的宏..."
+              
+              # 备份原文件
+              cp "$LIBFFI_CONFIGURE" "$LIBFFI_CONFIGURE.backup"
+              
+              # 方法1：注释掉第215行的LT_SYS_SYMBOL_USCORE
+              sed -i '215s/^LT_SYS_SYMBOL_USCORE/#LT_SYS_SYMBOL_USCORE # Commented out for autoconf 2.71 compatibility/' "$LIBFFI_CONFIGURE"
+              
+              # 方法2：如果第215行包含该宏，整行注释
+              sed -i '/^.*LT_SYS_SYMBOL_USCORE.*$/s/^/# PATCHED: /' "$LIBFFI_CONFIGURE"
+              
+              echo "✅ libffi已修补！修改内容："
+              sed -n '213,217p' "$LIBFFI_CONFIGURE"
+              echo "🎯 修补完成，退出监控"
+              exit 0
+            else
+              echo "⚠️ configure.ac已被修补或不含问题宏"
+              exit 0
+            fi
+          fi
+        done
         
-        recipe = LibffiRecipe()
-        LIBFFI_RECIPE
+        echo "⚠️ 超时：未找到libffi configure.ac文件"
+        PATCHSCRIPT
         
-        echo "✅ 已创建自定义libffi 3.2.1 recipe"
+        chmod +x /tmp/patch_libffi.sh
+        
+        # 在后台启动修补程序
+        /tmp/patch_libffi.sh > /tmp/patch_libffi.log 2>&1 &
+        PATCH_PID=$!
+        echo "🚀 libffi修补程序已启动 (PID: $PATCH_PID)"
         
         # 直接使用Python-for-Android构建APK - 使用webview bootstrap避免SDL2依赖  
         p4a apk --private . \
@@ -457,6 +474,15 @@ jobs:
       run: |
         echo "🔍 开始P4A APK搜索..."
         
+        # 检查修补日志
+        echo "=== libffi修补日志 ==="
+        if [ -f /tmp/patch_libffi.log ]; then
+          cat /tmp/patch_libffi.log
+        else
+          echo "⚠️ 未找到修补日志文件"
+        fi
+        
+        echo ""
         echo "=== P4A标准输出目录 ==="
         find . -name "*.apk" -type f 2>/dev/null | while read apk; do
           echo "📱 找到APK: $apk"
@@ -490,6 +516,7 @@ jobs:
           dist/
           p4a_build.log
           p4a_build_retry.log
+          /tmp/patch_libffi.log
           *.apk
         retention-days: 30
         
