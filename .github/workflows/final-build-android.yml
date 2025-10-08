@@ -437,14 +437,17 @@ jobs:
         export NDK_CCACHE=""
         unset CCACHE_DIR
         
-        # 🔧 确保使用正确的编译器
-        export CC="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
-        export CXX="${ANDROID_NDK_HOME}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang++"
+        # ⚠️ 不要设置CC/CXX环境变量！
+        # P4A会自动为不同的编译目标设置正确的编译器：
+        # - hostpython3 使用本机gcc
+        # - 其他库使用NDK交叉编译器
+        unset CC
+        unset CXX
         
         echo "=== 编译环境设置 ==="
         echo "USE_CCACHE: $USE_CCACHE"
-        echo "CC: $CC"
-        echo "CXX: $CXX"
+        echo "NDK_CCACHE: $NDK_CCACHE"
+        echo "ANDROID_NDK_HOME: $ANDROID_NDK_HOME"
         
         p4a create --dist-name tradingbot \
             --bootstrap=service_only \
